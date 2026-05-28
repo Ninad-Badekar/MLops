@@ -1,0 +1,34 @@
+.venv/*
+/.venv
+
+# DVC outputs (managed by DVC, not git)
+/model.pkl
+/metrics.json
+
+# Source data (managed via DVC pipeline)
+/water_potability.csv
+
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Tooling
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
