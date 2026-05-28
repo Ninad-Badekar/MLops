@@ -1,3 +1,4 @@
+import os
 from fastapi import FastAPI
 import pickle
 import pandas as pd
@@ -7,7 +8,8 @@ app = FastAPI(
     title="Water Potability Prediction API",
     description="API for predicting water potability based on various features.",
 )
-with open("/home/neosoft/MLOps/model.pkl", "rb") as f:
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "model.pkl")
+with open(MODEL_PATH, "rb") as f:
     model = pickle.load(f)
 
 

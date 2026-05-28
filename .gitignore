@@ -2,7 +2,6 @@
 /.venv
 
 # DVC outputs (managed by DVC, not git)
-/model.pkl
 /metrics.json
 
 # Source data (managed via DVC pipeline)
