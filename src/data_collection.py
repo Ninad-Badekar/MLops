@@ -1,10 +1,15 @@
-import pandas as pd
 import os
+
+import pandas as pd
+import yaml
 from sklearn.model_selection import train_test_split
 
 data = pd.read_csv(r"/home/neosoft/MLOps/water_potability.csv")
 
-train_data, test_data = train_test_split(data, test_size=0.2, random_state=42)
+test_size = yaml.safe_load(open("params.yaml"))["data_collection"]["test_size"]
+
+train_data, test_data = train_test_split(data, test_size=test_size, random_state=42)
+
 
 data_path = os.path.join("data", "raw")
 

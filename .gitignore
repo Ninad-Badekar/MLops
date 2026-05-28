@@ -31,3 +31,4 @@ Thumbs.db
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
+/model.pkl
