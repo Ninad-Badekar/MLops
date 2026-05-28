@@ -28,7 +28,7 @@ dvc repro
 ## Serve API
 
 ```bash
-uvicorn src.main:app --reload
+cd src && uvicorn main:app --reload
 ```
 
 ## Project structure
