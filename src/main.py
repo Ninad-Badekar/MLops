@@ -3,7 +3,7 @@ import pickle
 
 import pandas as pd
 from fastapi import FastAPI
-from data_model import Water
+from src.data_model import Water
 
 app = FastAPI(
     title="Water Potability Prediction API",
