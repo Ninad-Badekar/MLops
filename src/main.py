@@ -1,14 +1,16 @@
 import os
-from fastapi import FastAPI
 import pickle
+
 import pandas as pd
+from fastapi import FastAPI
 from data_model import Water
 
 app = FastAPI(
     title="Water Potability Prediction API",
     description="API for predicting water potability based on various features.",
 )
-MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "model.pkl")
+
+MODEL_PATH = os.path.join(os.path.dirname(__file__), "..", "models", "model.pkl")
 with open(MODEL_PATH, "rb") as f:
     model = pickle.load(f)
 
@@ -20,25 +22,9 @@ def index():
 
 @app.post("/predict")
 def predict(data: Water):
-    sample = pd.DataFrame(
-        [
-            {
-                "ph": data.ph,
-                "Hardness": data.Hardness,
-                "Solids": data.Solids,
-                "Chloramines": data.Chloramines,
-                "Sulfate": data.Sulfate,
-                "Conductivity": data.Conductivity,
-                "Organic_carbon": data.Organic_carbon,
-                "Trihalomethanes": data.Trihalomethanes,
-                "Turbidity": data.Turbidity,
-            }
-        ]
-    )
-
+    sample = pd.DataFrame([data.model_dump()])
     prediction = model.predict(sample)
 
     if prediction[0] == 1:
         return {"prediction": "The water is Consumable."}
-    else:
-        return {"prediction": "The water is Not Consumable."}
+    return {"prediction": "The water is Not Consumable."}

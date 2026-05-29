@@ -1,34 +1,94 @@
-.venv/*
-/.venv
-
-# DVC outputs (managed by DVC, not git)
-/metrics.json
-
-# Source data (managed via DVC pipeline)
-/water_potability.csv
-
-# Python
+# Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
+# C extensions
 *.so
 *.egg-info/
 *.egg
 dist/
 build/
 
-# IDE
-.vscode/
-.idea/
+# Distribution / packaging
+.Python
+.venv
+env/
+develop-eggs/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+.installed.cfg
 
-# Environment
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+
+# Translations
+*.mo
+*.pot
+
+# log files
+*.log
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# DotEnv configuration
 .env
 
-# OS
+# Database
+*.db
+*.rdb
+
+# IDE
+.idea
+.vscode/
+.vscode/
+
+# Spyder
+.spyproject/
+
+# Jupyter NB Checkpoints
+.ipynb_checkpoints/
+
+# exclude data from source control by default
+/data/
+
+# Mac OS-specific storage files
 .DS_Store
 Thumbs.db
+
+# vim
+*.swp
+*.swo
 
 # Tooling
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
-/model.pkl
+
+# DVC-managed artifacts
+/models/model.pkl
+/reports/metrics.json
