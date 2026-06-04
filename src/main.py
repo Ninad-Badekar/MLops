@@ -33,7 +33,7 @@ feature_columns = [
 
 @app.on_event("startup")
 def startup_event():
-    global model, baseline_stats
+    global model
     
     # 1. Load model
     if os.path.exists(MODEL_PATH):
