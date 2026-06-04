@@ -92,3 +92,7 @@ Thumbs.db
 # DVC-managed artifacts
 /models/model.pkl
 /reports/metrics.json
+
+# MLflow
+mlruns/
+/reports/mlflow_run_id.txt

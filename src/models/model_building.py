@@ -1,8 +1,11 @@
+import os
 import pickle
 
 import pandas as pd
 import yaml
 from sklearn.ensemble import RandomForestClassifier
+import mlflow
+import mlflow.sklearn
 
 
 def load_params(filepath: str) -> int:
@@ -40,8 +43,21 @@ def main():
     n_estimators = load_params(params_path)
     train_data = load_data(data_path)
     X_train, y_train = prepare_data(train_data)
-    model = train_model(X_train, y_train, n_estimators)
-    save_model(model, model_name)
+
+    mlflow.set_experiment("Water Potability Prediction")
+    with mlflow.start_run() as run:
+        mlflow.log_param("n_estimators", n_estimators)
+        mlflow.log_param("train_data_shape", str(train_data.shape))
+
+        model = train_model(X_train, y_train, n_estimators)
+        save_model(model, model_name)
+
+        mlflow.sklearn.log_model(model, "model")
+
+        # Save run ID to a file to be picked up by the evaluation stage
+        os.makedirs("reports", exist_ok=True)
+        with open("reports/mlflow_run_id.txt", "w") as f:
+            f.write(run.info.run_id)
 
 
 if __name__ == "__main__":

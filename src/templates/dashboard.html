@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Water Potability MLOps Dashboard</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 24, 39, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0b0f19 70%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 30px;
+            overflow-x: hidden;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--card-border);
+            padding-bottom: 20px;
+        }
+
+        .logo-section h1 {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(to right, #a78bfa, #60a5fa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-section p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 4px;
+        }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+            padding: 8px 16px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            margin-right: 8px;
+            box-shadow: 0 0 10px var(--accent-green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        /* Dashboard Grid Layout */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .stat-card {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 10px;
+        }
+
+        .stat-val {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .stat-subtext {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 8px;
+            display: flex;
+            align-items: center;
+        }
+
+        .drift-warning {
+            color: var(--accent-orange);
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-weight: 600;
+        }
+
+        .drift-ok {
+            color: var(--accent-green);
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
+            border-radius: 6px;
+            padding: 2px 6px;
+            font-weight: 600;
+        }
+
+        /* Visual Layout */
+        .main-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            min-height: 320px;
+            position: relative;
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .chart-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        /* Controls Section */
+        .controls-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .control-panel h3 {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--text-primary);
+            border-left: 3px solid var(--accent-purple);
+            padding-left: 10px;
+        }
+
+        .btn {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+            text-decoration: none;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+            filter: brightness(1.1);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-primary);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: none;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: none;
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, var(--accent-red), #b91c1c);
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+        }
+
+        .btn-danger:hover {
+            box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
+
+        .btn-warning {
+            background: linear-gradient(135deg, var(--accent-orange), #d97706);
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+        }
+
+        .btn-warning:hover {
+            box-shadow: 0 6px 16px rgba(245, 158, 11, 0.4);
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        /* Table Section */
+        .logs-section {
+            width: 100%;
+        }
+
+        .table-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            margin-top: 15px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 13px;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.03);
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            color: var(--text-primary);
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .badge-potable {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .badge-non-potable {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        /* Custom simulation form grid */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .form-group input {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            padding: 8px 12px;
+            color: white;
+            font-size: 13px;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--accent-purple);
+        }
+
+        /* Drift list */
+        .drift-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 5px;
+        }
+
+        .drift-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 10px 14px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.03);
+            font-size: 13px;
+        }
+
+        .drift-item-name {
+            font-weight: 500;
+        }
+
+        .drift-status-indicator {
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .mlflow-link {
+            display: flex;
+            align-items: center;
+            color: var(--accent-blue);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            padding: 8px 16px;
+            border-radius: 30px;
+            margin-right: 15px;
+            transition: all 0.2s ease;
+        }
+
+        .mlflow-link:hover {
+            background: rgba(59, 130, 246, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .mlflow-logo {
+            width: 16px;
+            height: 16px;
+            background: linear-gradient(135deg, #0194E2, #F88A00);
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+
+        .actions-header {
+            display: flex;
+            align-items: center;
+        }
+
+        /* Loading indicator for simulation */
+        .loader {
+            display: none;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-section">
+            <h1>Water Potability MLOps Center</h1>
+            <p>Real-time pipeline tracking, metrics logging, and data drift detection dashboard</p>
+        </div>
+        <div class="actions-header">
+            <a href="http://localhost:5000" target="_blank" class="mlflow-link">
+                <div class="mlflow-logo"></div>
+                MLflow Tracking UI
+            </a>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                API ACTIVE
+            </div>
+        </div>
+    </header>
+
+    <!-- Key Metrics Grid -->
+    <div class="dashboard-grid">
+        <div class="card stat-card">
+            <div>
+                <div class="stat-label">Total Predictions</div>
+                <div class="stat-val" id="val-total-predictions">0</div>
+            </div>
+            <div class="stat-subtext">Logged API inference count</div>
+        </div>
+        <div class="card stat-card">
+            <div>
+                <div class="stat-label">Average Latency</div>
+                <div class="stat-val" id="val-avg-latency">0.0 ms</div>
+            </div>
+            <div class="stat-subtext">Inference request delay</div>
+        </div>
+        <div class="card stat-card">
+            <div>
+                <div class="stat-label">Drift Status</div>
+                <div class="stat-val" id="val-drift-status">-</div>
+            </div>
+            <div class="stat-subtext" id="val-drift-subtext">Calculating drift...</div>
+        </div>
+        <div class="card stat-card">
+            <div>
+                <div class="stat-label">Baseline Accuracy</div>
+                <div class="stat-val" id="val-accuracy">69.1%</div>
+            </div>
+            <div class="stat-subtext">F1-Score: 45.0% (metrics.json)</div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="main-content">
+        <div class="card chart-container">
+            <div class="chart-header">
+                <h3 class="chart-title">Inference Latency History</h3>
+                <span class="stat-subtext">Recent requests</span>
+            </div>
+            <div style="height: 250px;">
+                <canvas id="latencyChart"></canvas>
+            </div>
+        </div>
+        <div class="card chart-container">
+            <div class="chart-header">
+                <h3 class="chart-title">Prediction Share</h3>
+                <span class="stat-subtext">Potability distribution</span>
+            </div>
+            <div style="height: 250px; display: flex; justify-content: center;">
+                <canvas id="predictionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Center & Drift Details -->
+    <div class="controls-grid">
+        <!-- Real-time Drift Tracker -->
+        <div class="card control-panel">
+            <h3>Real-time Data Drift Monitor</h3>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 15px;">
+                Compares the mean of logged API requests with baseline training metrics. A drift is flagged if values deviate beyond 1.5 standard deviations.
+            </p>
+            <div class="drift-list" id="drift-list-container">
+                <!-- Drift items populated by JS -->
+            </div>
+        </div>
+
+        <!-- Simulation Control Panel -->
+        <div class="card control-panel">
+            <h3>Traffic Simulator & Client</h3>
+            <p style="color: var(--text-secondary); font-size: 13px; margin-bottom: 15px;">
+                Simulate production traffic to generate prediction logs, test backend performance, and trigger data drift alerts.
+            </p>
+            
+            <div class="btn-group">
+                <button class="btn" onclick="runSimulation('normal')">
+                    Simulate Normal Traffic (x50)
+                    <div class="loader" id="normal-loader"></div>
+                </button>
+                <button class="btn btn-warning" onclick="runSimulation('drifted')">
+                    Simulate Drifted Traffic (x50)
+                    <div class="loader" id="drifted-loader"></div>
+                </button>
+                <button class="btn btn-danger" onclick="clearLogs()">Clear Log History</button>
+            </div>
+
+            <h3 style="margin-top: 25px; margin-bottom: 15px;">Manual Inference Test</h3>
+            <form id="inference-form" onsubmit="submitManualPrediction(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>pH (0-14)</label>
+                        <input type="number" step="0.01" name="ph" value="7.08" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Hardness</label>
+                        <input type="number" step="0.01" name="Hardness" value="196.36" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Solids</label>
+                        <input type="number" step="0.01" name="Solids" value="21835.16" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Chloramines</label>
+                        <input type="number" step="0.01" name="Chloramines" value="7.12" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Sulfate</label>
+                        <input type="number" step="0.01" name="Sulfate" value="333.77" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Conductivity</label>
+                        <input type="number" step="0.01" name="Conductivity" value="426.21" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Organic Carbon</label>
+                        <input type="number" step="0.01" name="Organic_carbon" value="14.16" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Trihalomethanes</label>
+                        <input type="number" step="0.01" name="Trihalomethanes" value="66.40" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Turbidity</label>
+                        <input type="number" step="0.01" name="Turbidity" value="3.97" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-secondary" style="width: 100%;">Send Custom Predict Request</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Live Prediction Table -->
+    <div class="card logs-section">
+        <h3 style="font-size: 18px; font-weight: 600; margin-bottom: 10px; border-left: 3px solid var(--accent-blue); padding-left: 10px;">
+            Recent Inferences Logs (Stored in data/monitoring/predictions_log.csv)
+        </h3>
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Timestamp</th>
+                        <th>pH</th>
+                        <th>Hardness</th>
+                        <th>Solids</th>
+                        <th>Chloramines</th>
+                        <th>Sulfate</th>
+                        <th>Conductivity</th>
+                        <th>Turbidity</th>
+                        <th>Prediction</th>
+                        <th>Latency</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-table-body">
+                    <!-- Logs populated by JS -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let latencyChart = null;
+        let predictionChart = null;
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // Initialize charts
+            initCharts();
+            // Fetch stats initially
+            fetchStats();
+            // Poll for updates every 5 seconds
+            setInterval(fetchStats, 5000);
+        });
+
+        function initCharts() {
+            const ctxLatency = document.getElementById('latencyChart').getContext('2d');
+            latencyChart = new Chart(ctxLatency, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Inference Latency (ms)',
+                        data: [],
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { display: false },
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                            ticks: { color: '#9ca3af' }
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+
+            const ctxPred = document.getElementById('predictionChart').getContext('2d');
+            predictionChart = new Chart(ctxPred, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Consumable', 'Not Consumable'],
+                    datasets: [{
+                        data: [0, 0],
+                        backgroundColor: ['#10b981', '#ef4444'],
+                        borderColor: '#111827',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: { color: '#f3f4f6', font: { family: 'Inter' } }
+                        }
+                    }
+                }
+            });
+        }
+
+        function fetchStats() {
+            fetch('/api/monitoring-stats')
+                .then(response => response.json())
+                .then(data => {
+                    updateDashboard(data);
+                })
+                .catch(error => console.error("Error fetching stats:", error));
+        }
+
+        function updateDashboard(data) {
+            // Update Stat Values
+            document.getElementById('val-total-predictions').innerText = data.total_predictions;
+            document.getElementById('val-avg-latency').innerText = data.avg_latency.toFixed(1) + " ms";
+            
+            // Update Drift status
+            const driftStatusEl = document.getElementById('val-drift-status');
+            const driftSubEl = document.getElementById('val-drift-subtext');
+            if (data.total_predictions === 0) {
+                driftStatusEl.innerHTML = `<span class="drift-ok" style="background: rgba(156, 163, 175, 0.1); color: var(--text-secondary); border-color: rgba(156, 163, 175, 0.2);">NO DATA</span>`;
+                driftSubEl.innerText = "Send predictions to calculate drift.";
+            } else if (data.drift_detected) {
+                driftStatusEl.innerHTML = `<span class="drift-warning">DRIFTED</span>`;
+                driftSubEl.innerHTML = `⚠️ ${data.drifted_features.length} feature(s) drifted!`;
+            } else {
+                driftStatusEl.innerHTML = `<span class="drift-ok">STABLE</span>`;
+                driftSubEl.innerText = "All features within safe limits.";
+            }
+
+            // Update Latency Chart
+            if (data.recent_latencies && data.recent_latencies.length > 0) {
+                latencyChart.data.labels = data.recent_latencies.map((_, i) => i + 1);
+                latencyChart.data.datasets[0].data = data.recent_latencies;
+                latencyChart.update();
+            } else {
+                latencyChart.data.labels = [];
+                latencyChart.data.datasets[0].data = [];
+                latencyChart.update();
+            }
+
+            // Update Prediction Chart
+            predictionChart.data.datasets[0].data = [data.potable_count, data.non_potable_count];
+            predictionChart.update();
+
+            // Update Drift list
+            const driftContainer = document.getElementById('drift-list-container');
+            driftContainer.innerHTML = '';
+            
+            Object.keys(data.feature_drift).forEach(feature => {
+                const fData = data.feature_drift[feature];
+                const driftItem = document.createElement('div');
+                driftItem.className = 'drift-item';
+                
+                let badgeClass = 'drift-ok';
+                let text = 'STABLE';
+                if (fData.drift) {
+                    badgeClass = 'drift-warning';
+                    text = 'DRIFTED';
+                }
+                
+                driftItem.innerHTML = `
+                    <div class="drift-item-name">${feature}</div>
+                    <div style="text-align: right;">
+                        <span class="drift-status-indicator ${badgeClass}">${text}</span>
+                        <div style="font-size: 10px; color: var(--text-secondary); margin-top: 4px;">
+                            Ref: ${fData.baseline_mean.toFixed(2)} | Current: ${fData.logged_mean.toFixed(2)}
+                        </div>
+                    </div>
+                `;
+                driftContainer.appendChild(driftItem);
+            });
+
+            // Update Logs Table
+            const tableBody = document.getElementById('logs-table-body');
+            tableBody.innerHTML = '';
+            if (data.recent_predictions && data.recent_predictions.length > 0) {
+                data.recent_predictions.forEach(p => {
+                    const row = document.createElement('tr');
+                    const badge = p.prediction.includes("Not") ? 
+                        `<span class="badge-non-potable">Not Consumable</span>` : 
+                        `<span class="badge-potable">Consumable</span>`;
+                    
+                    row.innerHTML = `
+                        <td style="color: var(--text-secondary); font-size: 11px;">${p.timestamp}</td>
+                        <td>${parseFloat(p.ph).toFixed(2)}</td>
+                        <td>${parseFloat(p.Hardness).toFixed(1)}</td>
+                        <td>${parseFloat(p.Solids).toFixed(0)}</td>
+                        <td>${parseFloat(p.Chloramines).toFixed(2)}</td>
+                        <td>${parseFloat(p.Sulfate).toFixed(1)}</td>
+                        <td>${parseFloat(p.Conductivity).toFixed(0)}</td>
+                        <td>${parseFloat(p.Turbidity).toFixed(2)}</td>
+                        <td>${badge}</td>
+                        <td style="font-weight: 500;">${parseFloat(p.latency).toFixed(1)} ms</td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } else {
+                tableBody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-secondary); padding: 30px;">No predictions logged yet. Try simulating traffic or manual prediction.</td></tr>`;
+            }
+        }
+
+        function runSimulation(type) {
+            const loader = document.getElementById(type + '-loader');
+            loader.style.display = 'inline-block';
+            
+            fetch('/api/simulate?traffic_type=' + type, { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    loader.style.display = 'none';
+                    fetchStats();
+                })
+                .catch(error => {
+                    loader.style.display = 'none';
+                    console.error("Simulation failed:", error);
+                    alert("Simulation completed with errors. Check API console.");
+                });
+        }
+
+        function clearLogs() {
+            if (confirm("Are you sure you want to clear prediction logs?")) {
+                fetch('/api/clear-logs', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        fetchStats();
+                    })
+                    .catch(error => console.error("Failed to clear logs:", error));
+            }
+        }
+
+        function submitManualPrediction(event) {
+            event.preventDefault();
+            const formData = new FormData(event.target);
+            const dataObj = {};
+            formData.forEach((value, key) => {
+                dataObj[key] = parseFloat(value);
+            });
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(dataObj)
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert("Prediction: " + data.prediction);
+                fetchStats();
+            })
+            .catch(error => {
+                console.error("Prediction failed:", error);
+                alert("Prediction request failed.");
+            });
+        }
+    </script>
+</body>
+</html>
