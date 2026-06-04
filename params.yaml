@@ -1,5 +1,5 @@
 data_collection:
   test_size: 0.20
 model_building:
-  model_type: "random_forest"
-  n_estimators: 1000
+  model_type: "gradient_boosting"
+  n_estimators: 100
