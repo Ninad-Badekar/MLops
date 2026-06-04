@@ -1,3 +1,18 @@
+import sys
+from unittest.mock import MagicMock
+
+# Protobuf compatibility monkeypatch for older MLflow
+try:
+    import google.protobuf.service
+except ImportError:
+    class MockService:
+        RpcController = MagicMock
+        RpcChannel = MagicMock
+        Service = MagicMock
+    sys.modules['google.protobuf.service'] = MockService
+    import google.protobuf
+    google.protobuf.service = MockService
+
 import json
 import os
 import pickle
@@ -45,6 +60,7 @@ def main():
     metrics = evaluate_model(model, X_test, y_test)
     save_metrics(metrics, metrics_path)
 
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("Water Potability Prediction")
     
     run_id = None

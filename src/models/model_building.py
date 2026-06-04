@@ -1,3 +1,18 @@
+import sys
+from unittest.mock import MagicMock
+
+# Protobuf compatibility monkeypatch for older MLflow
+try:
+    import google.protobuf.service
+except ImportError:
+    class MockService:
+        RpcController = MagicMock
+        RpcChannel = MagicMock
+        Service = MagicMock
+    sys.modules['google.protobuf.service'] = MockService
+    import google.protobuf
+    google.protobuf.service = MockService
+
 import os
 import pickle
 
@@ -44,6 +59,7 @@ def main():
     train_data = load_data(data_path)
     X_train, y_train = prepare_data(train_data)
 
+    mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("Water Potability Prediction")
     with mlflow.start_run() as run:
         mlflow.log_param("n_estimators", n_estimators)
@@ -52,7 +68,12 @@ def main():
         model = train_model(X_train, y_train, n_estimators)
         save_model(model, model_name)
 
-        mlflow.sklearn.log_model(model, "model")
+        # Log the model and register it in the Model Registry
+        mlflow.sklearn.log_model(
+            model, 
+            "model", 
+            registered_model_name="WaterPotabilityModel"
+        )
 
         # Save run ID to a file to be picked up by the evaluation stage
         os.makedirs("reports", exist_ok=True)
