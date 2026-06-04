@@ -1,4 +1,4 @@
-.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3
+.PHONY: clean data lint requirements sync_data_to_s3 sync_data_from_s3 install-hooks
 
 #################################################################################
 # GLOBALS                                                                       #
@@ -75,6 +75,14 @@ endif
 ## Test python environment is setup correctly
 test_environment:
 	$(PYTHON_INTERPRETER) test_environment.py
+
+## Install Git pre-push hooks
+install-hooks:
+	@echo "Installing pre-push hook..."
+	@mkdir -p .git/hooks
+	@cp -f scripts/pre-push .git/hooks/pre-push
+	@chmod +x .git/hooks/pre-push
+	@echo "Pre-push hook installed successfully."
 
 #################################################################################
 # PROJECT RULES                                                                 #

@@ -1,0 +1,23 @@
+#!/bin/bash
+echo "🛡️ Running pre-push checks..."
+
+# 1. Run strict lint check
+.venv/bin/flake8 src/ --count --select=E9,F63,F7,F82 --show-source --statistics
+LINT_STATUS=$?
+
+if [ $LINT_STATUS -ne 0 ]; then
+    echo "❌ Linter found critical issues. Push aborted."
+    exit 1
+fi
+
+# 2. Run unit tests
+PYTHONPATH=. .venv/bin/pytest tests/ -v
+TEST_STATUS=$?
+
+if [ $TEST_STATUS -ne 0 ]; then
+    echo "❌ Unit tests failed. Push aborted."
+    exit 1
+fi
+
+echo "✅ Pre-push checks passed. Pushing commits..."
+exit 0
