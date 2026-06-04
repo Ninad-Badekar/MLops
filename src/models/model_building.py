@@ -23,10 +23,12 @@ import mlflow
 import mlflow.sklearn
 
 
-def load_params(filepath: str) -> int:
+def load_params(filepath: str) -> tuple[str, int]:
     with open(filepath) as f:
         params = yaml.safe_load(f)
-    return params["model_building"]["n_estimators"]
+    model_type = params["model_building"].get("model_type", "random_forest")
+    n_estimators = params["model_building"].get("n_estimators", 100)
+    return model_type, n_estimators
 
 
 def load_data(filepath: str) -> pd.DataFrame:
@@ -39,13 +41,23 @@ def prepare_data(df: pd.DataFrame):
     return X, y
 
 
-def train_model(X, y, n_estimators: int) -> RandomForestClassifier:
-    clf = RandomForestClassifier(n_estimators=n_estimators)
+def train_model(X, y, model_type: str, n_estimators: int):
+    if model_type == "random_forest":
+        clf = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+    elif model_type == "gradient_boosting":
+        from sklearn.ensemble import GradientBoostingClassifier
+        clf = GradientBoostingClassifier(n_estimators=n_estimators, random_state=42)
+    elif model_type == "logistic_regression":
+        from sklearn.linear_model import LogisticRegression
+        clf = LogisticRegression(max_iter=1000, random_state=42)
+    else:
+        raise ValueError(f"Unknown model_type: {model_type}")
+    
     clf.fit(X, y)
     return clf
 
 
-def save_model(model: RandomForestClassifier, filepath: str) -> None:
+def save_model(model, filepath: str) -> None:
     with open(filepath, "wb") as f:
         pickle.dump(model, f)
 
@@ -55,17 +67,18 @@ def main():
     data_path = "data/processed/train_processed_mean.csv"
     model_name = "models/model.pkl"
 
-    n_estimators = load_params(params_path)
+    model_type, n_estimators = load_params(params_path)
     train_data = load_data(data_path)
     X_train, y_train = prepare_data(train_data)
 
     mlflow.set_tracking_uri("sqlite:///mlflow.db")
     mlflow.set_experiment("Water Potability Prediction")
     with mlflow.start_run() as run:
+        mlflow.log_param("model_type", model_type)
         mlflow.log_param("n_estimators", n_estimators)
         mlflow.log_param("train_data_shape", str(train_data.shape))
 
-        model = train_model(X_train, y_train, n_estimators)
+        model = train_model(X_train, y_train, model_type, n_estimators)
         save_model(model, model_name)
 
         # Log the model and register it in the Model Registry
