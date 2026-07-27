@@ -113,6 +113,28 @@
             transform: translateY(-1px);
         }
 
+        .mlflow-link.disabled {
+            color: var(--text-secondary);
+            background: rgba(156, 163, 175, 0.1);
+            border-color: rgba(156, 163, 175, 0.2);
+            pointer-events: none;
+        }
+
+        .mlflow-meta {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 4px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .mlflow-meta strong {
+            color: #93c5fd;
+            font-weight: 600;
+        }
+
         /* Dashboard Grid Layout */
         .dashboard-grid {
             display: grid;
@@ -400,8 +422,11 @@
             <p>Real-time MLOps pipeline tracking & data drift alerts</p>
         </div>
         <div class="actions-header">
-            <a href="http://localhost:5000" target="_blank" class="mlflow-link">
-                MLflow Server
+            <div class="mlflow-meta" id="mlflow-meta">
+                <span id="mlflow-summary">Loading experiment info...</span>
+            </div>
+            <a id="mlflow-link" href="#" target="_blank" class="mlflow-link">
+                Open MLflow UI
             </a>
             <div class="status-badge">
                 <span class="status-dot"></span>
@@ -536,6 +561,7 @@
 
     <script>
         const API_KEY = __API_KEY_JSON__;
+        const MLFLOW_UI_URL = __MLFLOW_UI_URL_JSON__;
         let predictionChart = null;
 
         function authHeaders(extra) {
@@ -547,10 +573,51 @@
         }
 
         document.addEventListener("DOMContentLoaded", function() {
+            initMlflowPanel();
             initCharts();
             fetchStats();
             setInterval(fetchStats, 5000);
         });
+
+        async function initMlflowPanel() {
+            const mlflowLink = document.getElementById('mlflow-link');
+            const mlflowSummary = document.getElementById('mlflow-summary');
+
+            try {
+                const response = await fetch('/api/mlflow-info');
+                const info = await response.json();
+                const uiUrl = info.ui_url || MLFLOW_UI_URL;
+
+                if (info.configured) {
+                    const metrics = info.metrics || {};
+                    const f1 = metrics.f1 != null ? Number(metrics.f1).toFixed(3) : 'n/a';
+                    const acc = metrics.accuracy != null ? Number(metrics.accuracy).toFixed(3) : 'n/a';
+                    const run = info.run_id ? info.run_id.slice(0, 8) : 'latest';
+                    mlflowSummary.innerHTML = `<strong>MLflow configured</strong> · run ${run} · acc ${acc} · f1 ${f1}`;
+                } else {
+                    mlflowSummary.textContent = 'MLflow tracking will appear after dvc repro';
+                }
+
+                if (uiUrl) {
+                    mlflowLink.href = uiUrl;
+                    mlflowLink.textContent = 'Open MLflow UI';
+                    mlflowLink.classList.remove('disabled');
+                    mlflowLink.setAttribute('target', '_blank');
+                } else {
+                    mlflowLink.classList.add('disabled');
+                    mlflowLink.textContent = 'MLflow UI (local only)';
+                    mlflowLink.removeAttribute('target');
+                }
+            } catch (error) {
+                mlflowSummary.textContent = 'MLflow info unavailable';
+                if (MLFLOW_UI_URL) {
+                    mlflowLink.href = MLFLOW_UI_URL;
+                } else {
+                    mlflowLink.classList.add('disabled');
+                    mlflowLink.textContent = 'MLflow: Not configured';
+                }
+            }
+        }
 
         function initCharts() {
             const ctxPred = document.getElementById('predictionChart').getContext('2d');

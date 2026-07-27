@@ -31,6 +31,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_PATH = os.path.join(BASE_DIR, "models", "model.pkl")
 TRAIN_DATA_PATH = os.path.join(BASE_DIR, "data", "processed", "train_processed_mean.csv")
 DASHBOARD_TEMPLATE_PATH = os.path.join(BASE_DIR, "src", "templates", "dashboard.html")
+METRICS_PATH = os.path.join(BASE_DIR, "reports", "metrics.json")
+MLFLOW_RUN_ID_PATH = os.path.join(BASE_DIR, "reports", "mlflow_run_id.txt")
+MLFLOW_DB_PATH = os.path.join(BASE_DIR, "mlflow.db")
 RING_BUFFER_SIZE = 1000
 
 model = None
@@ -168,6 +171,76 @@ def _sample_simulation_features(traffic_type: str) -> dict[str, float]:
     return features
 
 
+def _resolve_mlflow_ui_url() -> str:
+    """Return MLflow UI URL from env, or a sensible local default."""
+    explicit = os.getenv("MLFLOW_UI_URL", "").strip()
+    if explicit:
+        return explicit
+    # Azure App Service sets WEBSITE_SITE_NAME; no bundled MLflow UI there.
+    if os.getenv("WEBSITE_SITE_NAME"):
+        return ""
+    return "http://127.0.0.1:5000"
+
+
+def _load_mlflow_summary() -> dict:
+    """Load latest experiment summary from reports and optional local MLflow DB."""
+    tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
+    summary: dict = {
+        "configured": False,
+        "tracking_uri": tracking_uri,
+        "ui_url": _resolve_mlflow_ui_url(),
+        "experiment_name": "Water Potability Prediction",
+        "registered_model_name": "WaterPotabilityModel",
+        "run_id": None,
+        "metrics": {},
+        "params": {},
+    }
+
+    if os.path.exists(MLFLOW_RUN_ID_PATH):
+        try:
+            with open(MLFLOW_RUN_ID_PATH, "r", encoding="utf-8") as f:
+                run_id = f.read().strip()
+                if run_id:
+                    summary["run_id"] = run_id
+                    summary["configured"] = True
+        except OSError as exc:
+            logger.warning("Failed to read MLflow run id: %s", exc)
+
+    if os.path.exists(METRICS_PATH):
+        try:
+            with open(METRICS_PATH, "r", encoding="utf-8") as f:
+                summary["metrics"] = json.load(f)
+                summary["configured"] = True
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("Failed to read metrics.json: %s", exc)
+
+    # Enrich from local sqlite tracking store when available (dev/CI artifact).
+    if os.path.exists(MLFLOW_DB_PATH):
+        try:
+            import mlflow
+
+            mlflow.set_tracking_uri(tracking_uri)
+            runs = mlflow.search_runs(
+                experiment_names=[summary["experiment_name"]],
+                order_by=["start_time DESC"],
+                max_results=1,
+            )
+            if not runs.empty:
+                latest = runs.iloc[0]
+                summary["configured"] = True
+                if summary["run_id"] is None and "run_id" in latest:
+                    summary["run_id"] = str(latest["run_id"])
+                for col in latest.index:
+                    if col.startswith("metrics."):
+                        summary["metrics"][col.replace("metrics.", "")] = float(latest[col])
+                    if col.startswith("params."):
+                        summary["params"][col.replace("params.", "")] = str(latest[col])
+        except Exception as exc:
+            logger.warning("Failed to query MLflow tracking store: %s", exc)
+
+    return summary
+
+
 @app.on_event("startup")
 def startup_event():
     global model
@@ -196,6 +269,7 @@ def index():
             "health": "/health (GET)",
             "dashboard": "/dashboard (GET)",
             "monitoring_stats": "/api/monitoring-stats (GET)",
+            "mlflow_info": "/api/mlflow-info (GET)",
             "simulate": "/api/simulate (POST)",
             "clear_logs": "/api/clear-logs (POST)",
         },
@@ -233,10 +307,15 @@ def get_dashboard():
             content = f.read()
         # Inject API key so browser buttons can call protected endpoints.
         content = content.replace("__API_KEY_JSON__", json.dumps(os.getenv("API_KEY", "")))
-        # Optional public MLflow UI URL; keep empty when not deployed.
-        content = content.replace("__MLFLOW_UI_URL_JSON__", json.dumps(os.getenv("MLFLOW_UI_URL", "")))
+        content = content.replace("__MLFLOW_UI_URL_JSON__", json.dumps(_resolve_mlflow_ui_url()))
         return HTMLResponse(content=content, status_code=200)
     return HTMLResponse(content="<h1>Dashboard file not found.</h1>", status_code=404)
+
+
+@app.get("/api/mlflow-info")
+def get_mlflow_info():
+    """Expose MLflow tracking summary for the dashboard."""
+    return _load_mlflow_summary()
 
 
 @app.post("/predict", dependencies=[Depends(_require_api_key)])

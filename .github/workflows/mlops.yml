@@ -49,13 +49,19 @@ jobs:
     - name: Package deploy zip
       if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
       run: |
-        mkdir -p deploy_pkg/models deploy_pkg/data/processed deploy_pkg/src
+        mkdir -p deploy_pkg/models deploy_pkg/data/processed deploy_pkg/reports deploy_pkg/src
         cp requirements-serve.txt deploy_pkg/requirements.txt
         cp setup.py params.yaml deploy_pkg/ 2>/dev/null || true
         cp -r src deploy_pkg/
         cp models/model.pkl deploy_pkg/models/
         if [ -f data/processed/train_processed_mean.csv ]; then
           cp data/processed/train_processed_mean.csv deploy_pkg/data/processed/
+        fi
+        if [ -f reports/metrics.json ]; then
+          cp reports/metrics.json deploy_pkg/reports/
+        fi
+        if [ -f reports/mlflow_run_id.txt ]; then
+          cp reports/mlflow_run_id.txt deploy_pkg/reports/
         fi
         cd deploy_pkg && zip -r ../deploy.zip .
       # zip is used by webapps-deploy

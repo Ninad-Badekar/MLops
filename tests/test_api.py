@@ -116,6 +116,16 @@ def test_monitoring_stats_endpoint(client):
     assert "drift_detected" in data
 
 
+def test_mlflow_info_endpoint(client):
+    response = client.get("/api/mlflow-info")
+    assert response.status_code == 200
+    data = response.json()
+    assert "configured" in data
+    assert "tracking_uri" in data
+    assert "ui_url" in data
+    assert "metrics" in data
+
+
 def test_simulate_traffic(client):
     response = client.post("/api/simulate?traffic_type=normal")
     assert response.status_code == 200
