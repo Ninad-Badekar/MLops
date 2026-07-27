@@ -36,20 +36,25 @@ def load_data(filepath: str) -> pd.DataFrame:
 
 
 def prepare_data(df: pd.DataFrame):
-    X = df.drop("Potability", axis=1).values
-    y = df["Potability"].values
+    # Keep feature names so sklearn models carry them into inference metadata.
+    X = df.drop("Potability", axis=1)
+    y = df["Potability"]
     return X, y
 
 
 def train_model(X, y, model_type: str, n_estimators: int):
     if model_type == "random_forest":
-        clf = RandomForestClassifier(n_estimators=n_estimators, random_state=42)
+        clf = RandomForestClassifier(
+            n_estimators=n_estimators,
+            random_state=42,
+            class_weight="balanced",
+        )
     elif model_type == "gradient_boosting":
         from sklearn.ensemble import GradientBoostingClassifier
         clf = GradientBoostingClassifier(n_estimators=n_estimators, random_state=42)
     elif model_type == "logistic_regression":
         from sklearn.linear_model import LogisticRegression
-        clf = LogisticRegression(max_iter=1000, random_state=42)
+        clf = LogisticRegression(max_iter=1000, random_state=42, class_weight="balanced")
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
     

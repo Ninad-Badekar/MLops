@@ -113,6 +113,13 @@
             transform: translateY(-1px);
         }
 
+        .mlflow-link.disabled {
+            color: var(--text-secondary);
+            background: rgba(156, 163, 175, 0.1);
+            border-color: rgba(156, 163, 175, 0.2);
+            pointer-events: none;
+        }
+
         /* Dashboard Grid Layout */
         .dashboard-grid {
             display: grid;
@@ -400,7 +407,7 @@
             <p>Real-time MLOps pipeline tracking & data drift alerts</p>
         </div>
         <div class="actions-header">
-            <a href="http://localhost:5000" target="_blank" class="mlflow-link">
+            <a id="mlflow-link" href="#" target="_blank" class="mlflow-link">
                 MLflow Server
             </a>
             <div class="status-badge">
@@ -536,6 +543,7 @@
 
     <script>
         const API_KEY = __API_KEY_JSON__;
+        const MLFLOW_UI_URL = __MLFLOW_UI_URL_JSON__;
         let predictionChart = null;
 
         function authHeaders(extra) {
@@ -547,6 +555,14 @@
         }
 
         document.addEventListener("DOMContentLoaded", function() {
+            const mlflowLink = document.getElementById('mlflow-link');
+            if (MLFLOW_UI_URL) {
+                mlflowLink.href = MLFLOW_UI_URL;
+            } else {
+                mlflowLink.classList.add('disabled');
+                mlflowLink.textContent = 'MLflow: Not configured';
+                mlflowLink.removeAttribute('target');
+            }
             initCharts();
             fetchStats();
             setInterval(fetchStats, 5000);

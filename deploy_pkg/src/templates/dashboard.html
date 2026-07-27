@@ -535,7 +535,16 @@
     </div>
 
     <script>
+        const API_KEY = __API_KEY_JSON__;
         let predictionChart = null;
+
+        function authHeaders(extra) {
+            const headers = Object.assign({}, extra || {});
+            if (API_KEY) {
+                headers['X-API-Key'] = API_KEY;
+            }
+            return headers;
+        }
 
         document.addEventListener("DOMContentLoaded", function() {
             initCharts();
@@ -653,8 +662,17 @@
             const loader = document.getElementById(type + '-loader');
             if (loader) loader.style.display = 'inline-block';
             
-            fetch('/api/simulate?traffic_type=' + type, { method: 'POST' })
-                .then(response => response.json())
+            fetch('/api/simulate?traffic_type=' + type, {
+                method: 'POST',
+                headers: authHeaders()
+            })
+                .then(async response => {
+                    const data = await response.json();
+                    if (!response.ok) {
+                        throw new Error(data.detail || 'Simulation failed');
+                    }
+                    return data;
+                })
                 .then(data => {
                     if (loader) loader.style.display = 'none';
                     fetchStats();
@@ -662,17 +680,30 @@
                 .catch(error => {
                     if (loader) loader.style.display = 'none';
                     console.error("Simulation failed:", error);
+                    alert("Simulation failed: " + error.message);
                 });
         }
 
         function clearLogs() {
             if (confirm("Are you sure you want to clear prediction logs?")) {
-                fetch('/api/clear-logs', { method: 'POST' })
-                    .then(response => response.json())
+                fetch('/api/clear-logs', {
+                    method: 'POST',
+                    headers: authHeaders()
+                })
+                    .then(async response => {
+                        const data = await response.json();
+                        if (!response.ok) {
+                            throw new Error(data.detail || 'Failed to clear logs');
+                        }
+                        return data;
+                    })
                     .then(data => {
                         fetchStats();
                     })
-                    .catch(error => console.error("Failed to clear logs:", error));
+                    .catch(error => {
+                        console.error("Failed to clear logs:", error);
+                        alert("Failed to clear logs: " + error.message);
+                    });
             }
         }
 
@@ -705,17 +736,23 @@
 
             fetch('/predict', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: authHeaders({ 'Content-Type': 'application/json' }),
                 body: JSON.stringify(dataObj)
             })
-            .then(response => response.json())
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.detail || 'Prediction request failed');
+                }
+                return data;
+            })
             .then(data => {
                 alert("Prediction: " + data.prediction);
                 fetchStats();
             })
             .catch(error => {
                 console.error("Prediction failed:", error);
-                alert("Prediction request failed.");
+                alert("Prediction request failed: " + error.message);
             });
         }
     </script>

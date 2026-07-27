@@ -35,6 +35,8 @@ RING_BUFFER_SIZE = 1000
 
 model = None
 baseline_stats = {}
+potable_samples: list[dict[str, float]] = []
+non_potable_samples: list[dict[str, float]] = []
 prediction_log: deque = deque(maxlen=RING_BUFFER_SIZE)
 feature_columns = [
     "ph",
@@ -108,6 +110,64 @@ def _load_baseline_stats() -> None:
             baseline_stats[col] = {"mean": mean, "std": std}
 
 
+def _load_simulation_profiles(train_path: str) -> None:
+    """Load labeled rows from training data for realistic traffic simulation."""
+    global potable_samples, non_potable_samples
+    potable_samples = []
+    non_potable_samples = []
+
+    if not os.path.exists(train_path):
+        return
+
+    try:
+        train_df = pd.read_csv(train_path)
+        if "Potability" not in train_df.columns:
+            return
+
+        for _, row in train_df[train_df["Potability"] == 1].iterrows():
+            potable_samples.append({col: float(row[col]) for col in feature_columns if col in row})
+        for _, row in train_df[train_df["Potability"] == 0].iterrows():
+            non_potable_samples.append({col: float(row[col]) for col in feature_columns if col in row})
+    except Exception as exc:
+        logger.warning("Error loading simulation profiles: %s", exc)
+
+
+def _jitter_features(features: dict[str, float], scale: float = 0.05) -> dict[str, float]:
+    """Add small random noise so simulated requests are not identical."""
+    jittered = {}
+    for col in feature_columns:
+        value = float(features.get(col, baseline_stats.get(col, {}).get("mean", 0.0)))
+        jittered[col] = max(0.0, value * random.uniform(1.0 - scale, 1.0 + scale))
+    return jittered
+
+
+def _sample_simulation_features(traffic_type: str) -> dict[str, float]:
+    """Build feature vectors from labeled training rows when available."""
+    if traffic_type == "normal" and potable_samples:
+        return _jitter_features(random.choice(potable_samples))
+    if traffic_type != "normal" and non_potable_samples:
+        return _jitter_features(random.choice(non_potable_samples), scale=0.08)
+
+    # Fallback when training data is unavailable (e.g. minimal deploy package).
+    features = {}
+    if traffic_type == "normal":
+        for col in feature_columns:
+            mean = baseline_stats.get(col, {}).get("mean", DEFAULT_BASELINE.get(col, (0.0, 1.0))[0])
+            std = baseline_stats.get(col, {}).get("std", DEFAULT_BASELINE.get(col, (0.0, 1.0))[1])
+            features[col] = random.gauss(mean, std * 0.25)
+    else:
+        features["ph"] = random.uniform(2.5, 4.5) if random.random() < 0.7 else random.uniform(9.5, 11.5)
+        features["Hardness"] = random.uniform(130.0, 260.0)
+        features["Solids"] = random.uniform(40000.0, 52000.0)
+        features["Chloramines"] = random.uniform(4.0, 10.0)
+        features["Sulfate"] = random.uniform(420.0, 510.0)
+        features["Conductivity"] = random.uniform(320.0, 560.0)
+        features["Organic_carbon"] = random.uniform(9.0, 19.0)
+        features["Trihalomethanes"] = random.uniform(40.0, 95.0)
+        features["Turbidity"] = random.uniform(6.5, 8.5)
+    return features
+
+
 @app.on_event("startup")
 def startup_event():
     global model
@@ -124,6 +184,7 @@ def startup_event():
     logger.info(json.dumps({"event": "model_loaded", "path": model_path}))
 
     _load_baseline_stats()
+    _load_simulation_profiles(TRAIN_DATA_PATH)
 
 
 @app.get("/")
@@ -172,6 +233,8 @@ def get_dashboard():
             content = f.read()
         # Inject API key so browser buttons can call protected endpoints.
         content = content.replace("__API_KEY_JSON__", json.dumps(os.getenv("API_KEY", "")))
+        # Optional public MLflow UI URL; keep empty when not deployed.
+        content = content.replace("__MLFLOW_UI_URL_JSON__", json.dumps(os.getenv("MLFLOW_UI_URL", "")))
         return HTMLResponse(content=content, status_code=200)
     return HTMLResponse(content="<h1>Dashboard file not found.</h1>", status_code=404)
 
@@ -314,27 +377,7 @@ def simulate_traffic(traffic_type: str = Query("normal", description="Traffic ty
 
     count = 50
     for _ in range(count):
-        features = {}
-        if traffic_type == "normal":
-            features["ph"] = random.uniform(6.2, 7.8)
-            features["Hardness"] = random.uniform(170.0, 220.0)
-            features["Solids"] = random.uniform(18000.0, 25000.0)
-            features["Chloramines"] = random.uniform(6.0, 8.2)
-            features["Sulfate"] = random.uniform(310.0, 360.0)
-            features["Conductivity"] = random.uniform(390.0, 460.0)
-            features["Organic_carbon"] = random.uniform(12.0, 16.5)
-            features["Trihalomethanes"] = random.uniform(55.0, 75.0)
-            features["Turbidity"] = random.uniform(3.5, 4.5)
-        else:
-            features["ph"] = random.uniform(2.5, 4.5) if random.random() < 0.7 else random.uniform(9.5, 11.5)
-            features["Hardness"] = random.uniform(196.36 - 60, 196.36 + 60)
-            features["Solids"] = random.uniform(40000.0, 52000.0)
-            features["Chloramines"] = random.uniform(7.12 - 3, 7.12 + 3)
-            features["Sulfate"] = random.uniform(420.0, 510.0)
-            features["Conductivity"] = random.uniform(426.21 - 100, 426.21 + 100)
-            features["Organic_carbon"] = random.uniform(14.16 - 5, 14.16 + 5)
-            features["Trihalomethanes"] = random.uniform(66.40 - 25, 66.40 + 25)
-            features["Turbidity"] = random.uniform(6.5, 8.5)
+        features = _sample_simulation_features(traffic_type)
 
         start_time = time.perf_counter()
         sample = np.array([[float(features[col]) for col in feature_columns]], dtype=float)
