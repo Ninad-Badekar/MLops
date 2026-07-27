@@ -1,0 +1,6 @@
+# Copy to terraform.tfvars and fill in your values.
+subscription_id = "0e7a014b-abbe-493b-8085-7278a7f37c4c"
+azure_location  = "centralindia"
+project_name    = "water-potability-mlops"
+environment     = "portfolio"
+app_service_sku = "F1"

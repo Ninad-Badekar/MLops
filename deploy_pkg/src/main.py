@@ -169,10 +169,7 @@ def health():
 def get_dashboard():
     if os.path.exists(DASHBOARD_TEMPLATE_PATH):
         with open(DASHBOARD_TEMPLATE_PATH, "r") as f:
-            content = f.read()
-        # Inject API key so browser buttons can call protected endpoints.
-        content = content.replace("__API_KEY_JSON__", json.dumps(os.getenv("API_KEY", "")))
-        return HTMLResponse(content=content, status_code=200)
+            return HTMLResponse(content=f.read(), status_code=200)
     return HTMLResponse(content="<h1>Dashboard file not found.</h1>", status_code=404)
 
 

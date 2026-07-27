@@ -36,9 +36,8 @@ def load_data(filepath: str) -> pd.DataFrame:
 
 
 def prepare_data(df: pd.DataFrame):
-    # Keep feature names so sklearn models carry them into inference metadata.
-    X = df.drop("Potability", axis=1)
-    y = df["Potability"]
+    X = df.drop("Potability", axis=1).values
+    y = df["Potability"].values
     return X, y
 
 

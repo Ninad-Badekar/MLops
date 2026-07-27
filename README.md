@@ -1,57 +1,108 @@
-Water Potablity Project
-==============================
+# Water Potability MLOps (Azure Students Starter)
 
-It heng a model to predict wether the water is consumable or not
+End-to-end MLOps demo that **runs on Azure for Students Starter**: DVC + MLflow in CI, FastAPI on **App Service (Free F1)**.
 
-Project Organization
-------------
+> Starter blocks Storage, ACR, Key Vault, Container Apps, etc. This repo is tailored to what Starter allows (`Microsoft.Web`, `Microsoft.Insights`).
 
-    ├── LICENSE
-    ├── Makefile           <- Makefile with commands like `make data` or `make train`
-    ├── README.md          <- The top-level README for developers using this project.
-    ├── data
-    │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
-    │   ├── processed      <- The final, canonical data sets for modeling.
-    │   └── raw            <- The original, immutable data dump.
-    │
-    ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
-    │
-    ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
-    │
-    ├── reports            <- Generated analysis as HTML, PDF, LaTeX, etc.
-    │   └── figures        <- Generated graphics and figures to be used in reporting
-    │
-    ├── requirements.txt   <- The requirements file for reproducing the analysis environment, e.g.
-    │                         generated with `pip freeze > requirements.txt`
-    │
-    ├── setup.py           <- makes project pip installable (pip install -e .) so src can be imported
-    ├── src                <- Source code for use in this project.
-    │   ├── __init__.py    <- Makes src a Python module
-    │   │
-    │   ├── data           <- Scripts to download or generate data
-    │   │   └── make_dataset.py
-    │   │
-    │   ├── features       <- Scripts to turn raw data into features for modeling
-    │   │   └── build_features.py
-    │   │
-    │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
-    │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
+## Architecture
 
+```text
+GitHub Actions
+  ├─ dvc repro + pytest + MLflow (sqlite)
+  └─ deploy.zip (API + model.pkl) ──► Azure App Service (Python 3.12)
+                                         └─ Application Insights
+```
 
---------
+See [docs/azure-architecture.md](docs/azure-architecture.md).
 
-<p><small>Project based on the <a target="_blank" href="https://drivendata.github.io/cookiecutter-data-science/">cookiecutter data science project template</a>. #cookiecutterdatascience</small></p>
+## Local quickstart
+
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+dvc repro
+uvicorn src.main:app --reload --port 8000
+```
+
+- API: http://127.0.0.1:8000/docs  
+- Health: http://127.0.0.1:8000/health  
+- Dashboard: http://127.0.0.1:8000/dashboard  
+
+## Deploy on Students Starter
+
+### 1. Login
+
+```bash
+az login
+az account show
+```
+
+### 2. Clean previous failed Terraform state (important)
+
+If you already tried the full Container Apps stack:
+
+```bash
+cd ~/MLops/MLops/infra
+export PATH="$HOME/.local/bin:$PATH"
+terraform destroy -auto-approve || true
+rm -rf .terraform terraform.tfstate terraform.tfstate.backup
+```
+
+### 3. Apply App Service infra
+
+```bash
+cd ~/MLops/MLops/infra
+cp terraform.tfvars.example terraform.tfvars   # already filled if present
+# ensure subscription_id matches az account show
+terraform init -upgrade
+terraform apply
+```
+
+Type `yes`. This creates only: Resource Group, Free App Service Plan, Linux Web App, Application Insights.
+
+### 4. Save outputs
+
+```bash
+terraform output
+terraform output -raw api_key
+terraform output -raw get_publish_profile_command
+# run the printed az command, copy XML:
+az webapp deployment list-publishing-profiles \
+  --name "$(terraform output -raw webapp_name)" \
+  --resource-group "$(terraform output -raw resource_group)" \
+  --xml
+```
+
+### 5. GitHub secrets
+
+| Secret | Value |
+|--------|--------|
+| `AZURE_WEBAPP_NAME` | `terraform output -raw webapp_name` |
+| `AZURE_WEBAPP_PUBLISH_PROFILE` | full XML from the `az ... --xml` command |
+
+### 6. Push to main
+
+Push/merge to `main`. CI trains, zips the API + model, deploys to App Service.
+
+Open: `terraform output -raw api_url`
+
+Predict:
+
+```bash
+API_URL=$(cd infra && terraform output -raw api_url)
+API_KEY=$(cd infra && terraform output -raw api_key)
+curl -X POST "$API_URL/predict" \
+  -H "X-API-Key: $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"ph":7,"Hardness":200,"Solids":20000,"Chloramines":7,"Sulfate":300,"Conductivity":400,"Organic_carbon":15,"Trihalomethanes":60,"Turbidity":4}'
+```
+
+## Tear down
+
+```bash
+cd infra && terraform destroy
+```
+
+## License
+
+MIT — see [LICENSE](LICENSE).

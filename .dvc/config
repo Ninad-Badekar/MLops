@@ -1,4 +1,4 @@
 [core]
     remote = myremote
 ['remote "myremote"']
-    url = /home/neosoft/MLOps_temp
+    url = ../dvc-storage
